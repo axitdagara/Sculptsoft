@@ -1,15 +1,18 @@
 import mysql.connector
-
+import os 
+import dotenv
+dotenv.load_dotenv()
 connection = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="123456789",
+    host=os.getenv("host"),
+    user=os.getenv("user"),
+    password=os.getenv("password"),
     database="student_recordss"
 )
 
 print("Database Connected Successfully")
 
 cursor = connection.cursor()
+student_recordss
 
 
 # cursor.execute("SELECT * FROM students")
