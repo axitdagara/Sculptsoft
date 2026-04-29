@@ -48,5 +48,4 @@ VALUES
 
 
 
-SELECT students.name, courses.course_name FROM student_courses JOIN students ON student_courses.student_id = students.student_id
-                                  JOIN courses ON student_courses.course_id = courses.course_id;
+SELECT students.name, courses.course_name FROM student_courses JOIN students ON student_courses.student_id = students.student_id JOIN courses ON student_courses.course_id = courses.course_id;
