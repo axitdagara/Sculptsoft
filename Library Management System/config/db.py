@@ -1,39 +1,34 @@
+import os
+import dotenv
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 
-import mysql.connector
-from mysql.connector import Error
+dotenv.load_dotenv()
 
 
 def create_connection():
-    """
-    Create and return MySQL database connection
-    """
-
     try:
-        connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="123456789",
-            database="library_management_system"
+        connection = psycopg2.connect(
+            host=os.getenv("host"),
+            user=os.getenv("user"),
+            password=os.getenv("password"),
+            database=os.getenv("database"),
+            port=os.getenv("port")
         )
 
-        if connection.is_connected():
-            print("Database connected successfully")
+        print("PostgreSQL connected successfully")
 
         return connection
 
-    except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
+    except Exception as e:
+        print(f"Error while connecting to PostgreSQL: {e}")
         return None
 
 
+
 def get_cursor(connection):
-    """
-    Return cursor object
-    """
-
-    return connection.cursor(dictionary=True)
-
+    return connection.cursor(cursor_factory=RealDictCursor)
 
 
 if __name__ == "__main__":
