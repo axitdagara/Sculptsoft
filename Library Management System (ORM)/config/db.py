@@ -5,12 +5,17 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine
 from config.exceptions import DatabaseError
+from config.logger import get_logger
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 dotenv.load_dotenv()     ## baki 
 
 
+logger = get_logger(__name__)
+
+
 def create_connection():
+    logger.info("Creating raw database connection")
     host = os.getenv("host")
     user = os.getenv("user")
     password = os.getenv("password")
@@ -23,6 +28,7 @@ def create_connection():
 
     if missing_vars:
         error_msg = f"Missing required database configuration: {', '.join(missing_vars)}"
+        logger.error(error_msg)
         raise DatabaseError(error_msg)
 
     connection = psycopg2.connect(
@@ -64,6 +70,7 @@ def _build_sqlalchemy_url():
 
     if missing_vars:
         error_msg = f"Missing required database configuration: {', '.join(missing_vars)}"
+        logger.error(error_msg)
         raise DatabaseError(error_msg)
 
     return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
@@ -77,6 +84,7 @@ _SessionLocal = None
 def get_engine():
     global _engine
     if _engine is None:
+        logger.info("Creating SQLAlchemy engine")
         url = _build_sqlalchemy_url()
         _engine = create_engine(url)
     return _engine
@@ -86,6 +94,7 @@ def get_session():
     
     global _SessionLocal
     if _SessionLocal is None:
+        logger.info("Creating SQLAlchemy session factory")
         engine = get_engine()
         _SessionLocal = sessionmaker(bind=engine, autoflush=False)
     return _SessionLocal()
