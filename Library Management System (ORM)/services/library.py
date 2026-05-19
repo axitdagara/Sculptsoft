@@ -4,8 +4,12 @@ from models.user import User
 from models.orm_models import BookORM, UserORM, BorrowHistoryORM
 from datetime import date, timedelta
 from sqlalchemy import select, func, and_, update, or_
-from sqlalchemy.exc import SQLAlchemyError
-from config.exceptions import NotFoundError, ValidationError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from config.exceptions import NotFoundError, ValidationError, DuplicateError
+from config.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class Library:
@@ -15,9 +19,11 @@ class Library:
 
     def _ensure_tables(self):
         try:
+            logger.info("Ensuring database tables exist")
             engine = get_engine()
             Base.metadata.create_all(bind=engine)
         except SQLAlchemyError:
+            logger.exception("Failed while creating tables")
             raise
 
     def create_book(self, title, author):
@@ -28,13 +34,19 @@ class Library:
             raise ValueError("Book author cannot be empty")
 
         try:
+            logger.info("Creating book title=%s", title)
             new_book = BookORM(title=title, author=author, available=True)
             self.session.add(new_book)
             self.session.commit()
             self.session.refresh(new_book)
             return Book(new_book.book_id, title, author, True)
+        except IntegrityError:
+            self.session.rollback()
+            logger.warning("Duplicate book detected title=%s", title)
+            raise DuplicateError("Book", title)
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while creating book title=%s", title)
             raise
 
     def create_user(self, name):
@@ -43,13 +55,19 @@ class Library:
             raise ValueError("User name cannot be empty")
 
         try:
+            logger.info("Creating user name=%s", name)
             new_user = UserORM(name=name, borrow_limit=3, borrow_days=14, fine_per_day=2.0)
             self.session.add(new_user)
             self.session.commit()
             self.session.refresh(new_user)
             return User(new_user.user_id, name)
+        except IntegrityError:
+            self.session.rollback()
+            logger.warning("Duplicate user detected name=%s", name)
+            raise DuplicateError("User", name)
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while creating user name=%s", name)
             raise
 
     def add_book(self, book):
@@ -64,6 +82,9 @@ class Library:
             self.session.refresh(book_orm)
             book.book_id = book_orm.book_id
             return f"Book '{book.title}' added successfully"
+        except IntegrityError:
+            self.session.rollback()
+            raise DuplicateError("Book", book.title)
         except SQLAlchemyError:
             self.session.rollback()
             raise
@@ -77,12 +98,15 @@ class Library:
             stmt = select(BookORM).where(BookORM.book_id == book_id)
             book_obj = self.session.execute(stmt).scalar_one_or_none()
             if book_obj is None:
+                logger.warning("Book not found for removal book_id=%s", book_id)
                 raise NotFoundError("Book", book_id)
             self.session.delete(book_obj)
             self.session.commit()
+            logger.info("Removed book book_id=%s", book_id)
             return "Book removed successfully"
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while removing book book_id=%s", book_id)
             raise
 
     def register_user(self, user):
@@ -91,14 +115,20 @@ class Library:
             raise ValueError("User object must have a name")
 
         try:
+            logger.info("Registering user object name=%s", user.name)
             user_orm = UserORM(name=user.name, borrow_limit=user.borrow_limit, borrow_days=user.borrow_days, fine_per_day=user.fine_per_day)
             self.session.add(user_orm)
             self.session.commit()
             self.session.refresh(user_orm)
             user.user_id = user_orm.user_id
             return f"User '{user.name}' registered"
+        except IntegrityError:
+            self.session.rollback()
+            logger.warning("Duplicate user detected while registering name=%s", user.name)
+            raise DuplicateError("User", user.name)
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while registering user name=%s", user.name)
             raise
 
     def display_books(self):
@@ -155,19 +185,24 @@ class Library:
             raise ValueError("User ID must be a valid integer")
 
         try:
+            logger.info("Lending book book_id=%s to user_id=%s", book_id, user_id)
             book_obj = self._find_book_orm(book_id)
             if book_obj is None:
+                logger.warning("Book not found while lending book_id=%s", book_id)
                 raise NotFoundError("Book", book_id)
 
             if not book_obj.available:
+                logger.warning("Attempted to lend unavailable book book_id=%s", book_id)
                 raise ValidationError(f"'{book_obj.title}' is not available right now")
 
             user = self._find_user(user_id)
             if user is None:
+                logger.warning("User not found while lending user_id=%s", user_id)
                 raise NotFoundError("User", user_id)
 
             active_count = self._get_active_borrow_count(user_id)
             if active_count >= user.borrow_limit:
+                logger.warning("Borrow limit reached user_id=%s", user_id)
                 raise ValidationError(f"Borrow limit reached ({user.borrow_limit} books)")
 
             borrowed_date = date.today()
@@ -177,10 +212,12 @@ class Library:
             book_obj.available = False
             self.session.add(entry)
             self.session.commit()
+            logger.info("Book lent successfully book_id=%s user_id=%s due=%s", book_id, user_id, due_date)
 
             return f"{user.name} borrowed {book_obj.title}. Due on {due_date}."
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while lending book_id=%s user_id=%s", book_id, user_id)
             raise
 
     def accept_return(self, book_id, user_id):
@@ -191,12 +228,15 @@ class Library:
             raise ValueError("User ID must be a valid integer")
 
         try:
+            logger.info("Accepting return book_id=%s user_id=%s", book_id, user_id)
             book_obj = self._find_book_orm(book_id)
             if book_obj is None:
+                logger.warning("Book not found while returning book_id=%s", book_id)
                 raise NotFoundError("Book", book_id)
 
             user = self._find_user(user_id)
             if user is None:
+                logger.warning("User not found while returning user_id=%s", user_id)
                 raise NotFoundError("User", user_id)
 
             stmt = (
@@ -210,6 +250,7 @@ class Library:
             )
             borrow_row = self.session.execute(stmt).scalars().first()
             if borrow_row is None:
+                logger.warning("No active borrow found book_id=%s user_id=%s", book_id, user_id)
                 raise ValidationError(f"{user.name} has not borrowed {book_obj.title}")
 
             fine_per_day = float(user.fine_per_day) if hasattr(user, "fine_per_day") else 2.0
@@ -222,6 +263,7 @@ class Library:
             borrow_row.fine = fine
             book_obj.available = True
             self.session.commit()
+            logger.info("Book returned successfully book_id=%s user_id=%s fine=%.2f", book_id, user_id, fine)
 
             if fine > 0:
                 return f"{user.name} returned {book_obj.title}. Late by {late_days} days. Fine: {fine:.2f}."
@@ -229,6 +271,7 @@ class Library:
             return f"{user.name} returned {book_obj.title}. No fine."
         except SQLAlchemyError:
             self.session.rollback()
+            logger.exception("Database error while accepting return book_id=%s user_id=%s", book_id, user_id)
             raise
 
     def display_available_books(self):
@@ -360,7 +403,7 @@ class Library:
         due_date = due_row if due_row else "Unknown"
         return due_date
 
-    # helper to retrieve ORM Book object
+   
     def _find_book_orm(self, book_id):
         stmt = select(BookORM).where(BookORM.book_id == book_id)
         return self.session.execute(stmt).scalars().first()

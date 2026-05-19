@@ -1,5 +1,8 @@
-
+from config.logger import get_logger
 from services.library import Library
+
+
+logger = get_logger(__name__)
 
 
 def print_section(title, content):
@@ -33,12 +36,14 @@ def print_menu():
 
 
 def main():
+    logger.info("Starting library CLI")
     library = Library()
 
     while True:
         try:
             print_menu()
             choice = input("Choose an option: ").strip()
+            logger.info("Selected menu option: %s", choice)
 
             if choice == "1":
                 title = input("Enter title: ").strip()
@@ -74,10 +79,13 @@ def main():
                 print_section("Borrow History", library.display_user_borrow_history(user_id))
             elif choice == "11":
                 print("Exiting library system.")
+                logger.info("Exiting library CLI")
                 break
             else:
                 print("Invalid choice. Please select a valid option.")
+                logger.warning("Invalid menu option entered: %s", choice)
         except Exception:
+            logger.exception("Unhandled error in CLI loop")
             print("Something went wrong. Please try again.")
 
 
