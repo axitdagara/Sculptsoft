@@ -5,17 +5,12 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine
 from config.exceptions import DatabaseError
-from config.logger import get_logger
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-dotenv.load_dotenv()     ## baki 
-
-
-logger = get_logger(__name__)
+dotenv.load_dotenv()
 
 
 def create_connection():
-    logger.info("Creating raw database connection")
     host = os.getenv("host")
     user = os.getenv("user")
     password = os.getenv("password")
@@ -28,7 +23,6 @@ def create_connection():
 
     if missing_vars:
         error_msg = f"Missing required database configuration: {', '.join(missing_vars)}"
-        logger.error(error_msg)
         raise DatabaseError(error_msg)
 
     connection = psycopg2.connect(
@@ -43,18 +37,11 @@ def create_connection():
 
 
 def get_cursor(connection):
+    """Get a RealDictCursor from a database connection."""
     return connection.cursor(cursor_factory=RealDictCursor)
 
-#cursor = get_cursor(conn)
-#cursor.execute("SELECT * FROM users")
-# rows = curson.fetchall()
-## results are in dict , not in tupple so , row ["id"]  , access coloums by name
 
-
-
-
-
-
+# SQLAlchemy setup (for ORM usage)
 Base = declarative_base()
 
 
@@ -70,13 +57,16 @@ def _build_sqlalchemy_url():
 
     if missing_vars:
         error_msg = f"Missing required database configuration: {', '.join(missing_vars)}"
-        logger.error(error_msg)
         raise DatabaseError(error_msg)
 
     return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
 
 
+def get_database_url():
+    return _build_sqlalchemy_url()
 
+
+# Engine and session factory (created lazily)
 _engine = None
 _SessionLocal = None
 
@@ -84,17 +74,28 @@ _SessionLocal = None
 def get_engine():
     global _engine
     if _engine is None:
-        logger.info("Creating SQLAlchemy engine")
         url = _build_sqlalchemy_url()
-        _engine = create_engine(url)
+        _engine = create_engine(url, future=True)
     return _engine
 
 
-def get_session():
-    
+def get_session_factory():
     global _SessionLocal
     if _SessionLocal is None:
-        logger.info("Creating SQLAlchemy session factory")
         engine = get_engine()
-        _SessionLocal = sessionmaker(bind=engine, autoflush=False)
-    return _SessionLocal()
+        _SessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
+    return _SessionLocal
+
+
+def get_session():
+    """Return a new SQLAlchemy Session."""
+    session_factory = get_session_factory()
+    return session_factory()
+
+
+def get_db():
+    db = get_session()
+    try:
+        yield db
+    finally:
+        db.close()
