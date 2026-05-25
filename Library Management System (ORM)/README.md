@@ -1,112 +1,115 @@
-# Library Management System
+# Library Management API
 
-Console-based Library Management System built with Python and PostgreSQL.
+This project is a clean, internship-level backend built with FastAPI, SQLAlchemy ORM, and Alembic. It provides documented CRUD APIs for library users and books with proper HTTP status codes and structured error responses.
 
-## Overview
-This project helps you manage a small library from the terminal. You can:
-- Add and remove books
-- Register users
-- Lend and return books
-- View available books
-- Search books by title or author
-- Track borrow history per user
-- Apply automatic late-return fines
+## Features
 
 ## Tech Stack
-- Python 3.9+
-- PostgreSQL
-- `psycopg2`
-- `python-dotenv`
 
 ## Project Structure
 ```text
 .
-|-- main.py
-|-- README.md
-|-- config/
-|   |-- __init__.py
-|   |-- db.py
-|   `-- exceptions.py
-|-- database/
-|   `-- schema.sql
-|-- models/
-|   |-- __init__.py
-|   |-- book.py
-|   `-- user.py
-`-- services/
-    |-- __init__.py
-    `-- library.py
-```
+|-- alembic/
+|   |-- versions/
+# Library Management API
 
-## Setup
+This repository contains a simple internship-level backend API for managing a small library. It is built with FastAPI, SQLAlchemy ORM, and Alembic for migrations. The application is API-first. OpenAPI docs have been disabled in this project.
 
-### 1. Create and activate virtual environment
+## Highlights
+- CRUD endpoints for `books` and `users` under the `/api/v1` prefix
+- SQLAlchemy models in `models/` and Pydantic schemas in `schemas/`
+- Centralized error handling with consistent JSON responses
+- Alembic migration scripts in `alembic/` for schema changes
+
+## Prerequisites
+- Python 3.10 or later
+- PostgreSQL database accessible from your machine
+
+## Quick start
+
+1. Create and activate a Python virtual environment:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 2. Install dependencies
+2. Install the required packages:
+
 ```powershell
-pip install psycopg2-binary python-dotenv
+pip install -r requirements.txt
 ```
 
-### 3. Configure environment variables
-Create or update `.env` in the project root with:
+3. Create a local `.env` file (DO NOT commit this file). Example:
 
-```env
+```ini
+# .env (example - keep secrets out of version control)
 host=localhost
-user=your_postgres_user
-password=your_postgres_password
-database=your_database_name
+user=postgres
+password=YOUR_DB_PASSWORD
+database=library_managementt
 port=5432
 ```
 
-### 4. Ensure PostgreSQL database exists
-Create the database referenced by `database` in `.env`.
+4. Apply database migrations:
 
-Note: The application also auto-creates required tables at startup if they do not exist.
+```powershell
+alembic upgrade head
+```
 
-## Run the Application
+5. Run the application (development):
+
 ```powershell
 python main.py
 ```
 
-## Menu Options
-When the app starts, you can use:
-1. Add book
-2. Register user
-3. Lend book
-4. Return book
-5. Show all books
-6. Show registered users
-7. Show available books
-8. Remove book
-9. Search books by title/author
-10. Show user borrow history
-11. Exit
+Note: API documentation endpoints (Swagger/ReDoc/OpenAPI JSON) are disabled in this project.
 
-## Default Library Rules
-- Borrow limit per user: `3` books
-- Borrow period: `14` days
-- Fine per late day: `2.00`
+## API endpoints (summary)
 
-## Database Tables
-- `books`
-- `users`
-- `borrow_history`
+Books (`/api/v1/books`):
+- `GET /` — list books (200)
+- `POST /` — create book (201)
+- `GET /{book_id}` — get book (200 or 404)
+- `PUT /{book_id}` — update book (200)
+- `DELETE /{book_id}` — delete book (204)
 
-The schema file is available at `database/schema.sql`, and table creation is also handled in `services/library.py`.
+Users (`/api/v1/users`):
+- `GET /` — list users (200)
+- `POST /` — create user (201)
+- `GET /{user_id}` — get user (200 or 404)
+- `PUT /{user_id}` — update user (200)
+- `DELETE /{user_id}` — delete user (204)
 
-## Error Handling
-The app uses custom exceptions in `config/exceptions.py` for common failure cases, including:
-- Database connection issues
-- Missing users or books
-- Borrow limit violations
-- Invalid borrow/return operations
+## Error responses
+All handled errors return JSON of the form:
 
-## Future Improvements
-- Add unit tests
-- Add CLI argument support
-- Add logging configuration file
-- Add Docker support for PostgreSQL + app
+```json
+{
+    "error": "ErrorType",
+    "message": "Human readable message"
+}
+```
+
+## Project layout
+
+```
+.
+|-- alembic/                # alembic migration scripts
+|-- api/                    # FastAPI routers and error handlers
+|-- config/                 # DB wiring and application exceptions
+|-- models/                 # SQLAlchemy ORM mappings
+|-- schemas/                # Pydantic request/response schemas
+|-- main.py                 # FastAPI entrypoint
+|-- alembic.ini
+|-- requirements.txt
+`-- README.md
+```
+
+## Best practices & notes
+- Keep `.env` out of version control; add it to `.gitignore`.
+- Use Alembic to modify schema rather than editing DB files directly.
+- For production, add authentication, logging configuration, and containerization (Docker).
+
+## Want examples?
+I can add a Postman collection or example `curl` snippets for each endpoint — let me know which you'd prefer.
