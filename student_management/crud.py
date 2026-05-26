@@ -1,4 +1,5 @@
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+import traceback
 
 from models import Student, Course, Enrollment
 
@@ -8,62 +9,63 @@ from models import Student, Course, Enrollment
 
 
 def create_student(db, name, email, age):
+    # Return existing student if email already present
+    existing = db.query(Student).filter(Student.email == email).first()
+    if existing:
+        return existing
 
     try:
-        student = Student(
-            name=name,
-            email=email,
-            age=age
-        )
-
+        student = Student(name=name, email=email, age=age)
         db.add(student)
         db.commit()
         db.refresh(student)
-
         return student
-
-    except SQLAlchemyError as e:
+    except IntegrityError:
         db.rollback()
-        print("Error:", e)
+        # Race condition: another process inserted the same email
+        return db.query(Student).filter(Student.email == email).first()
+    except SQLAlchemyError:
+        db.rollback()
+        traceback.print_exc()
 
 
 def create_course(db, course_name, duration):
+    # Avoid duplicate course names
+    existing = db.query(Course).filter(Course.course_name == course_name).first()
+    if existing:
+        return existing
 
     try:
-        course = Course(
-            course_name=course_name,
-            duration=duration
-        )
-
+        course = Course(course_name=course_name, duration=duration)
         db.add(course)
         db.commit()
         db.refresh(course)
-
         return course
-
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
-        print("Error:", e)
+        traceback.print_exc()
 
 
 def enroll_student(db, student_id, course_id, grade=None):
+    # Avoid duplicate enrollment
+    existing = (
+        db.query(Enrollment)
+        .filter(Enrollment.student_id == student_id)
+        .filter(Enrollment.course_id == course_id)
+        .first()
+    )
+    if existing:
+        return existing
 
     try:
-        enrollment = Enrollment(
-            student_id=student_id,
-            course_id=course_id,
-            grade=grade
-        )
-
+        enrollment = Enrollment(student_id=student_id, course_id=course_id, grade=grade)
         db.add(enrollment)
         db.commit()
         db.refresh(enrollment)
-
         return enrollment
-
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
-        print("Error:", e)
+        traceback.print_exc()
 
 
 # READ OPERATIONS

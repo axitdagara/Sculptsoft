@@ -59,7 +59,7 @@ print("User detials")
 
 user = session.query(User).filter_by(id=1).first()
 
-session.delete(user)
+# session.delete(user)
 
 session.commit()
-session.close()
+# session.close()
