@@ -1,13 +1,14 @@
-from decimal import Decimal
-
-from fastapi import Body, Depends, FastAPI, Response, status
+from fastapi import APIRouter, Body, Depends, FastAPI, Response, status
 from sqlalchemy.orm import Session
 import uvicorn
 
-from api.error_handlers import register_exception_handlers
 from config.db import get_db
+from exceptions import UnauthorizedError
+from config.security import create_access_token
 from config.logger import get_logger
-from schemas import BookRead, BorrowActionResponse, BorrowHistoryRead, ErrorResponse, UserRead
+from models.orm_models import UserORM
+from schemas import BookRead, BorrowActionResponse, BorrowHistoryRead, ErrorResponse, TokenResponse, UserCreate, UserLogin, UserRead, UserUpdate
+from services.auth import authenticate_user, get_current_user
 from services.library import Library
 
 
@@ -23,7 +24,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-register_exception_handlers(app)
+
+public_router = APIRouter(prefix="/api/v1")   ## baki 
+protected_router = APIRouter(prefix="/api/v1", dependencies=[Depends(get_current_user)])
 
 
 def get_library(db: Session = Depends(get_db)) -> Library:
@@ -31,8 +34,52 @@ def get_library(db: Session = Depends(get_db)) -> Library:
 
 
 
-@app.get(
-    "/api/v1/books",
+@public_router.post(
+    "/auth/login",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Auth"],
+    summary="Log in with name and password",
+    responses={401: {"model": ErrorResponse}},
+)
+def login(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
+    user = authenticate_user(db, credentials.name, credentials.password)
+    token = create_access_token(subject=str(user.user_id), additional_claims={"name": user.name})
+    return TokenResponse(access_token=token)
+
+
+@protected_router.get(
+    "/auth/me",
+    response_model=UserRead,
+    status_code=status.HTTP_200_OK,
+    tags=["Auth"],
+    summary="Get the current authenticated user",
+)
+def get_me(current_user: UserORM = Depends(get_current_user)):
+    return current_user
+
+
+@public_router.post(
+    "/users",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Users"],
+    summary="Register a new user",
+    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
+def create_user(user: UserCreate = Body(...), library: Library = Depends(get_library)):
+    return library.create_user(
+        name=user.name,
+        password=user.password,
+        borrow_limit=user.borrow_limit,
+        borrow_days=user.borrow_days,
+        fine_per_day=user.fine_per_day,
+    )
+
+
+
+@protected_router.get(
+    "/books",
     response_model=list[BookRead],
     status_code=status.HTTP_200_OK,
     tags=["Books"],
@@ -42,8 +89,8 @@ def list_books(library: Library = Depends(get_library)):
     return library.list_books()
 
 
-@app.post(
-    "/api/v1/books",
+@protected_router.post(
+    "/books",
     response_model=BookRead,
     status_code=status.HTTP_201_CREATED,
     tags=["Books"],
@@ -58,8 +105,8 @@ def create_book(
     return library.create_book(title, author)
 
 
-@app.get(
-    "/api/v1/books/{book_id}",
+@protected_router.get(
+    "/books/{book_id}",
     response_model=BookRead,
     status_code=status.HTTP_200_OK,
     tags=["Books"],
@@ -70,8 +117,8 @@ def get_book(book_id: int, library: Library = Depends(get_library)):
     return library.get_book(book_id)
 
 
-@app.put(
-    "/api/v1/books/{book_id}",
+@protected_router.put(
+    "/books/{book_id}",
     response_model=BookRead,
     status_code=status.HTTP_200_OK,
     tags=["Books"],
@@ -88,8 +135,8 @@ def update_book(
     return library.update_book(book_id, title=title, author=author, available=available)
 
 
-@app.delete(
-    "/api/v1/books/{book_id}",
+@protected_router.delete(
+    "/books/{book_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Books"],
     summary="Delete a book",
@@ -100,8 +147,8 @@ def delete_book(book_id: int, library: Library = Depends(get_library)):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.get(
-    "/api/v1/users",
+@protected_router.get(
+    "/users",
     response_model=list[UserRead],
     status_code=status.HTTP_200_OK,
     tags=["Users"],
@@ -111,31 +158,8 @@ def list_users(library: Library = Depends(get_library)):
     return library.list_users()
 
 
-@app.post(
-    "/api/v1/users",
-    response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
-    tags=["Users"],
-    summary="Create a new user",
-    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
-)
-def create_user(
-    name: str = Body(..., min_length=1, max_length=255),
-    borrow_limit: int = Body(default=3, ge=1, le=10),
-    borrow_days: int = Body(default=14, ge=1, le=60),
-    fine_per_day: Decimal = Body(default=Decimal("2.00"), ge=0),
-    library: Library = Depends(get_library),
-):
-    return library.create_user(
-        name=name,
-        borrow_limit=borrow_limit,
-        borrow_days=borrow_days,
-        fine_per_day=fine_per_day,
-    )
-
-
-@app.get(
-    "/api/v1/users/{user_id}",
+@protected_router.get(
+    "/users/{user_id}",
     response_model=UserRead,
     status_code=status.HTTP_200_OK,
     tags=["Users"],
@@ -146,33 +170,27 @@ def get_user(user_id: int, library: Library = Depends(get_library)):
     return library.get_user(user_id)
 
 
-@app.put(
-    "/api/v1/users/{user_id}",
+@protected_router.put(
+    "/users/{user_id}",
     response_model=UserRead,
     status_code=status.HTTP_200_OK,
     tags=["Users"],
     summary="Update a user",
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-def update_user(
-    user_id: int,
-    name: str | None = Body(default=None, min_length=1, max_length=255),
-    borrow_limit: int | None = Body(default=None, ge=1, le=10),
-    borrow_days: int | None = Body(default=None, ge=1, le=60),
-    fine_per_day: Decimal | None = Body(default=None, ge=0),
-    library: Library = Depends(get_library),
-):
+def update_user(user_id: int, user: UserUpdate = Body(...), library: Library = Depends(get_library)):
     return library.update_user(
         user_id,
-        name=name,
-        borrow_limit=borrow_limit,
-        borrow_days=borrow_days,
-        fine_per_day=fine_per_day,
+        name=user.name,
+        password=user.password,
+        borrow_limit=user.borrow_limit,
+        borrow_days=user.borrow_days,
+        fine_per_day=user.fine_per_day,
     )
 
 
-@app.delete(
-    "/api/v1/users/{user_id}",
+@protected_router.delete(
+    "/users/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Users"],
     summary="Delete a user",
@@ -183,8 +201,8 @@ def delete_user(user_id: int, library: Library = Depends(get_library)):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.post(
-    "/api/v1/borrow",
+@protected_router.post(
+    "/borrow",
     response_model=BorrowActionResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Borrowing"],
@@ -194,13 +212,16 @@ def delete_user(user_id: int, library: Library = Depends(get_library)):
 def borrow_book(
     user_id: int = Body(..., ge=1),
     book_id: int = Body(..., ge=1),
+    current_user: UserORM = Depends(get_current_user),
     library: Library = Depends(get_library),
 ):
-    return library.borrow_book(user_id, book_id)
+    if user_id != current_user.user_id:
+        raise UnauthorizedError("You can only borrow books for your own account")
+    return library.borrow_book(current_user.user_id, book_id)
 
 
-@app.post(
-    "/api/v1/return",
+@protected_router.post(
+    "/return",
     response_model=BorrowActionResponse,
     status_code=status.HTTP_200_OK,
     tags=["Borrowing"],
@@ -210,21 +231,34 @@ def borrow_book(
 def return_book(
     user_id: int = Body(..., ge=1),
     book_id: int = Body(..., ge=1),
+    current_user: UserORM = Depends(get_current_user),
     library: Library = Depends(get_library),
 ):
-    return library.return_book(user_id, book_id)
+    if user_id != current_user.user_id:
+        raise UnauthorizedError("You can only return books for your own account")
+    return library.return_book(current_user.user_id, book_id)
 
 
-@app.get(
-    "/api/v1/users/{user_id}/borrow-history",
+@protected_router.get(
+    "/users/{user_id}/borrow-history",
     response_model=list[BorrowHistoryRead],
     status_code=status.HTTP_200_OK,
     tags=["Borrowing"],
     summary="Get a user's borrow history",
     responses={404: {"model": ErrorResponse}},
 )
-def get_user_borrow_history(user_id: int, library: Library = Depends(get_library)):
+def get_user_borrow_history(
+    user_id: int,
+    current_user: UserORM = Depends(get_current_user),
+    library: Library = Depends(get_library),
+):
+    if user_id != current_user.user_id:
+        raise UnauthorizedError("You can only view your own borrow history")
     return library.get_user_borrow_history(user_id)
+
+
+app.include_router(public_router)
+app.include_router(protected_router)
 
 
 if __name__ == "__main__":

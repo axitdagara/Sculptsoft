@@ -1,47 +1,14 @@
 from __future__ import annotations
 import os
 import dotenv
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine
-from config.exceptions import DatabaseError
+from exceptions import DatabaseError
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 dotenv.load_dotenv()
 
 
-def create_connection():
-    host = os.getenv("host")
-    user = os.getenv("user")
-    password = os.getenv("password")
-    database = os.getenv("database")
-    port = os.getenv("port")
 
-    
-    required_vars = {"host": host, "user": user, "password": password, "database": database, "port": port}
-    missing_vars = [key for key, value in required_vars.items() if not value]
-
-    if missing_vars:
-        error_msg = f"Missing required database configuration: {', '.join(missing_vars)}"
-        raise DatabaseError(error_msg)
-
-    connection = psycopg2.connect(
-        host=host,
-        user=user,
-        password=password,
-        database=database,
-        port=port,
-    )
-
-    return connection
-
-
-def get_cursor(connection):
-    """Get a RealDictCursor from a database connection."""
-    return connection.cursor(cursor_factory=RealDictCursor)
-
-
-# SQLAlchemy setup (for ORM usage)
 Base = declarative_base()
 
 
@@ -66,7 +33,6 @@ def get_database_url():
     return _build_sqlalchemy_url()
 
 
-# Engine and session factory (created lazily)
 _engine = None
 _SessionLocal = None
 

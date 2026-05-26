@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class BorrowActionResponse(BaseModel):
@@ -16,6 +16,10 @@ class BorrowActionResponse(BaseModel):
     returned_on: date | None = None
     fine: Decimal = Decimal("0.00")
 
+    @field_serializer("fine")
+    def serialize_fine(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
 
 class BorrowHistoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -29,3 +33,7 @@ class BorrowHistoryRead(BaseModel):
     due_on: date
     returned_on: date | None
     fine: Decimal
+
+    @field_serializer("fine")
+    def serialize_fine(self, value: Decimal) -> str:
+        return f"{value:.2f}"

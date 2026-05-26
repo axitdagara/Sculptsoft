@@ -5,8 +5,9 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from config.exceptions import DuplicateError, NotFoundError, ValidationError
+from exceptions import DuplicateError, NotFoundError, ValidationError
 from config.logger import get_logger
+from config.security import hash_password
 from models.orm_models import BookORM, BorrowHistoryORM, UserORM
 from schemas import BorrowActionResponse, BorrowHistoryRead
 
@@ -98,6 +99,7 @@ class Library:
     def create_user(
         self,
         name: str,
+        password: str,
         borrow_limit: int = 3,
         borrow_days: int = 14,
         fine_per_day: Decimal = Decimal("2.00"),
@@ -113,6 +115,7 @@ class Library:
         try:
             user = UserORM(
                 name=name,
+                password_hash=hash_password(password),
                 borrow_limit=borrow_limit,
                 borrow_days=borrow_days,
                 fine_per_day=fine_per_day,
@@ -139,6 +142,7 @@ class Library:
         self,
         user_id: int,
         name: str | None = None,
+        password: str | None = None,
         borrow_limit: int | None = None,
         borrow_days: int | None = None,
         fine_per_day: Decimal | None = None,
@@ -147,6 +151,7 @@ class Library:
 
         data = {
             "name": name,
+            "password": password,
             "borrow_limit": borrow_limit,
             "borrow_days": borrow_days,
             "fine_per_day": fine_per_day,
@@ -160,8 +165,22 @@ class Library:
             if not data["name"]:
                 raise ValidationError("Name cannot be blank")
 
+            duplicate = (
+                self.session.query(UserORM)
+                .filter(UserORM.user_id != user_id, UserORM.name.ilike(data["name"]))
+                .first()
+            )
+            if duplicate is not None:
+                raise DuplicateError("User", data["name"])
+
+        if "password" in data:
+            data["password_hash"] = hash_password(data.pop("password"))
+
         for key, value in data.items():
-            setattr(user, key, value)
+            if key == "password_hash":
+                user.password_hash = value
+            else:
+                setattr(user, key, value)
 
         self.session.commit()
         self.session.refresh(user)
