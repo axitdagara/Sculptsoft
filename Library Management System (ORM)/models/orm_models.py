@@ -18,7 +18,8 @@ class UserORM(Base):
     __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=True)
     borrow_limit = Column(Integer, nullable=False, default=3)
     borrow_days = Column(Integer, nullable=False, default=14)
     fine_per_day = Column(Numeric(10, 2), nullable=False, default=2.00)
