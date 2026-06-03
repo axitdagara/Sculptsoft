@@ -1,0 +1,63 @@
+{
+  "/api/v1/auth/me": {
+    "GET": [
+      "admin",
+      "user"
+    ]
+  },
+  "/api/v1/users": {
+    "GET": [
+      "admin"
+    ]
+  },
+  "/api/v1/users/{user_id}": {
+    "GET": [
+      "admin"
+    ],
+    "PUT": [
+      "admin"
+    ],
+    "DELETE": [
+      "admin"
+    ]
+  },
+  "/api/v1/books": {
+    "GET": [
+      "admin",
+      "user"
+    ],
+    "POST": [
+      "admin"
+    ]
+  },
+  "/api/v1/books/{book_id}": {
+    "GET": [
+      "admin",
+      "user"
+    ],
+    "PUT": [
+      "admin"
+    ],
+    "DELETE": [
+      "admin"
+    ]
+  },
+  "/api/v1/borrow": {
+    "POST": [
+      "admin",
+      "user"
+    ]
+  },
+  "/api/v1/return": {
+    "POST": [
+      "admin",
+      "user"
+    ]
+  },
+  "/api/v1/users/{user_id}/borrow-history": {
+    "GET": [
+      "admin",
+      "user"
+    ]
+  }
+}

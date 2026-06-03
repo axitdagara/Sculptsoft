@@ -22,7 +22,7 @@ protected_router = APIRouter(prefix="/api/v1", dependencies=[Depends(get_current
 )
 def login(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
     user = authenticate_user(db, credentials.name, credentials.password)
-    token = create_access_token(subject=str(user.user_id), additional_claims={"name": user.name})
+    token = create_access_token(subject=str(user.user_id), additional_claims={"name": user.name, "role": user.role})
     return TokenResponse(access_token=token)
 
 

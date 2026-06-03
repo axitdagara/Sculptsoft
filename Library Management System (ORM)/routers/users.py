@@ -22,6 +22,7 @@ def create_user(user: UserCreate = Body(...), library=Depends(get_library)):
     return library.create_user(
         name=user.name,
         password=user.password,
+        role=user.role,
         borrow_limit=user.borrow_limit,
         borrow_days=user.borrow_days,
         fine_per_day=user.fine_per_day,
@@ -64,6 +65,7 @@ def update_user(user_id: int, user: UserUpdate = Body(...), library=Depends(get_
         user_id,
         name=user.name,
         password=user.password,
+        role=user.role,
         borrow_limit=user.borrow_limit,
         borrow_days=user.borrow_days,
         fine_per_day=user.fine_per_day,

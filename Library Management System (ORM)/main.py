@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import uvicorn
 
 from config.logger import get_logger
+from config.security import rbac_middleware
 from routers import auth_protected_router, auth_public_router, books_router, borrow_router, users_protected_router, users_public_router
 
 
@@ -17,6 +18,8 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+
+app.middleware("http")(rbac_middleware)
 
 app.include_router(auth_public_router)
 app.include_router(auth_protected_router)
