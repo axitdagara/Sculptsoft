@@ -43,3 +43,8 @@ class DatabaseError(ApplicationError):
 class UnauthorizedError(ApplicationError):
     def __init__(self, message: str = "Authentication required"):
         super().__init__(status_code=401, detail=message)
+
+
+class ForbiddenError(ApplicationError):
+    def __init__(self, message: str = "You do not have permission to access this resource"):
+        super().__init__(status_code=403, detail=message)

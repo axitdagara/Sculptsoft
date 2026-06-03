@@ -8,16 +8,32 @@ from sqlalchemy.orm import Session
 from exceptions import DuplicateError, NotFoundError, ValidationError
 from config.logger import get_logger
 from config.security import hash_password
-from models.orm_models import BookORM, BorrowHistoryORM, UserORM
+from models.orm_models import BookORM, BorrowHistoryORM, RoleORM, UserORM, UserRoleORM
 from schemas import BorrowActionResponse, BorrowHistoryRead
 
 
 logger = get_logger(__name__)
 
+VALID_USER_ROLES = {"admin", "user"}
+
 
 class Library:
     def __init__(self, session: Session):
         self.session = session
+
+    def _get_or_create_role(self, name: str) -> RoleORM:
+        role = self.session.query(RoleORM).filter(RoleORM.name == name).first()
+        if role is not None:
+            return role
+
+        role = RoleORM(name=name)
+        self.session.add(role)
+        self.session.flush()
+        return role
+
+    def _assign_single_role(self, user: UserORM, role_name: str) -> None:
+        role = self._get_or_create_role(role_name)
+        user.role_assignments = [UserRoleORM(role=role)]
 
     def list_books(self):
         return self.session.query(BookORM).order_by(BookORM.book_id.asc()).all()
@@ -100,6 +116,7 @@ class Library:
         self,
         name: str,
         password: str,
+        role: str = "user",
         borrow_limit: int = 3,
         borrow_days: int = 14,
         fine_per_day: Decimal = Decimal("2.00"),
@@ -107,6 +124,10 @@ class Library:
         name = name.strip()
         if not name:
             raise ValidationError("Name cannot be blank")
+
+        role = role.strip().lower()
+        if role not in VALID_USER_ROLES:
+            raise ValidationError("Role must be either admin or user")
 
         duplicate = self.session.query(UserORM).filter(UserORM.name.ilike(name)).first()
         if duplicate is not None:
@@ -120,6 +141,7 @@ class Library:
                 borrow_days=borrow_days,
                 fine_per_day=fine_per_day,
             )
+            self._assign_single_role(user, role)
             self.session.add(user)
             self.session.commit()
             self.session.refresh(user)
@@ -143,6 +165,7 @@ class Library:
         user_id: int,
         name: str | None = None,
         password: str | None = None,
+        role: str | None = None,
         borrow_limit: int | None = None,
         borrow_days: int | None = None,
         fine_per_day: Decimal | None = None,
@@ -152,6 +175,7 @@ class Library:
         data = {
             "name": name,
             "password": password,
+            "role": role,
             "borrow_limit": borrow_limit,
             "borrow_days": borrow_days,
             "fine_per_day": fine_per_day,
@@ -176,11 +200,20 @@ class Library:
         if "password" in data:
             data["password_hash"] = hash_password(data.pop("password"))
 
+        role_name = data.pop("role", None)
+        if role_name is not None:
+            role_name = role_name.strip().lower()
+            if role_name not in VALID_USER_ROLES:
+                raise ValidationError("Role must be either admin or user")
+
         for key, value in data.items():
             if key == "password_hash":
                 user.password_hash = value
             else:
                 setattr(user, key, value)
+
+        if role_name is not None:
+            self._assign_single_role(user, role_name)
 
         self.session.commit()
         self.session.refresh(user)

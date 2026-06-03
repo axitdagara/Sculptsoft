@@ -25,9 +25,9 @@ def borrow_book(
     current_user: UserORM = Depends(get_current_user),
     library=Depends(get_library),
 ):
-    if user_id != current_user.user_id:
+    if current_user.role != "admin" and user_id != current_user.user_id:
         raise UnauthorizedError("You can only borrow books for your own account")
-    return library.borrow_book(current_user.user_id, book_id)
+    return library.borrow_book(user_id, book_id)
 
 
 @protected_router.post(
@@ -44,9 +44,9 @@ def return_book(
     current_user: UserORM = Depends(get_current_user),
     library=Depends(get_library),
 ):
-    if user_id != current_user.user_id:
+    if current_user.role != "admin" and user_id != current_user.user_id:
         raise UnauthorizedError("You can only return books for your own account")
-    return library.return_book(current_user.user_id, book_id)
+    return library.return_book(user_id, book_id)
 
 
 @protected_router.get(
@@ -62,6 +62,6 @@ def get_user_borrow_history(
     current_user: UserORM = Depends(get_current_user),
     library=Depends(get_library),
 ):
-    if user_id != current_user.user_id:
+    if current_user.role != "admin" and user_id != current_user.user_id:
         raise UnauthorizedError("You can only view your own borrow history")
     return library.get_user_borrow_history(user_id)

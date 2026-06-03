@@ -1,115 +1,144 @@
 # Library Management API
 
-This project is a clean, internship-level backend built with FastAPI, SQLAlchemy ORM, and Alembic. It provides documented CRUD APIs for library users and books with proper HTTP status codes and structured error responses.
+FastAPI backend for managing a small library system with SQLAlchemy ORM, Alembic migrations, JWT authentication, and role-based access control.
 
 ## Features
 
+- User registration and login with JWT access tokens
+- Role support for `admin` and `user`
+- RBAC route permissions loaded from `route_roles_cache.json`
+- CRUD endpoints for books
+- CRUD endpoints for users
+- Borrow, return, and user borrow-history endpoints
+- Centralized application exceptions and structured error handling
+- PostgreSQL database access through SQLAlchemy ORM
+- Alembic migrations for schema changes
+- API docs enabled at `/docs`, `/redoc`, and `/openapi.json`
+
 ## Tech Stack
 
+- Python 3.10+
+- FastAPI
+- SQLAlchemy ORM
+- Alembic
+- PostgreSQL with `psycopg2`
+- PyJWT
+- Passlib
+- python-dotenv
+
 ## Project Structure
+
 ```text
 .
 |-- alembic/
-|   |-- versions/
-# Library Management API
-
-This repository contains a simple internship-level backend API for managing a small library. It is built with FastAPI, SQLAlchemy ORM, and Alembic for migrations. The application is API-first. OpenAPI docs have been disabled in this project.
-
-## Highlights
-- CRUD endpoints for `books` and `users` under the `/api/v1` prefix
-- SQLAlchemy models in `models/` and Pydantic schemas in `schemas/`
-- Centralized error handling with consistent JSON responses
-- Alembic migration scripts in `alembic/` for schema changes
+|   |-- versions/          # Database migrations
+|   |-- env.py             # Alembic environment
+|-- config/
+|   |-- db.py              # Database session and engine setup
+|   |-- logger.py          # Application logging
+|   |-- security.py        # Password, JWT, and RBAC helpers
+|-- models/
+|   |-- orm_models.py      # SQLAlchemy models
+|-- routers/
+|   |-- auth.py            # Login and current-user routes
+|   |-- books.py           # Book routes
+|   |-- borrow.py          # Borrowing routes
+|   |-- users.py           # User routes
+|-- schemas/               # Pydantic request and response models
+|-- services/
+|   |-- auth.py            # Authentication service helpers
+|   |-- library.py         # Library business service
+|-- exceptions.py          # Custom application errors
+|-- main.py                # FastAPI app entrypoint
+|-- route_roles_cache.json # RBAC route permissions
+|-- alembic.ini
+|-- requirements.txt
+`-- README.md
+```
 
 ## Prerequisites
+
 - Python 3.10 or later
-- PostgreSQL database accessible from your machine
+- PostgreSQL database
 
-## Quick start
+## Quick Start
 
-1. Create and activate a Python virtual environment:
+1. Create and activate a virtual environment:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-2. Install the required packages:
+2. Install dependencies:
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-3. Create a local `.env` file (DO NOT commit this file). Example:
+3. Create a local `.env` file:
 
 ```ini
-# .env (example - keep secrets out of version control)
 host=localhost
 user=postgres
 password=YOUR_DB_PASSWORD
-database=library_managementt
+database=library_management
 port=5432
+JWT_SECRET=change-this-secret
+JWT_ALGORITHM=HS256
+JWT_EXPIRES_MINUTES=60
 ```
 
-4. Apply database migrations:
+4. Apply migrations:
 
 ```powershell
 alembic upgrade head
 ```
 
-5. Run the application (development):
+5. Run the development server:
 
 ```powershell
 python main.py
 ```
 
-Note: API documentation endpoints (Swagger/ReDoc/OpenAPI JSON) are disabled in this project.
+Open the API documentation at:
 
-## API endpoints (summary)
+- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/redoc`
+- `http://127.0.0.1:8000/openapi.json`
 
-Books (`/api/v1/books`):
-- `GET /` — list books (200)
-- `POST /` — create book (201)
-- `GET /{book_id}` — get book (200 or 404)
-- `PUT /{book_id}` — update book (200)
-- `DELETE /{book_id}` — delete book (204)
+## Endpoint Summary
 
-Users (`/api/v1/users`):
-- `GET /` — list users (200)
-- `POST /` — create user (201)
-- `GET /{user_id}` — get user (200 or 404)
-- `PUT /{user_id}` — update user (200)
-- `DELETE /{user_id}` — delete user (204)
+Auth:
 
-## Error responses
-All handled errors return JSON of the form:
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 
-```json
-{
-    "error": "ErrorType",
-    "message": "Human readable message"
-}
-```
+Users:
 
-## Project layout
+- `POST /api/v1/users`
+- `GET /api/v1/users`
+- `GET /api/v1/users/{user_id}`
+- `PUT /api/v1/users/{user_id}`
+- `DELETE /api/v1/users/{user_id}`
 
-```
-.
-|-- alembic/                # alembic migration scripts
-|-- api/                    # FastAPI routers and error handlers
-|-- config/                 # DB wiring and application exceptions
-|-- models/                 # SQLAlchemy ORM mappings
-|-- schemas/                # Pydantic request/response schemas
-|-- main.py                 # FastAPI entrypoint
-|-- alembic.ini
-|-- requirements.txt
-`-- README.md
-```
+Books:
 
-## Best practices & notes
-- Keep `.env` out of version control; add it to `.gitignore`.
-- Use Alembic to modify schema rather than editing DB files directly.
-- For production, add authentication, logging configuration, and containerization (Docker).
+- `GET /api/v1/books`
+- `POST /api/v1/books`
+- `GET /api/v1/books/{book_id}`
+- `PUT /api/v1/books/{book_id}`
+- `DELETE /api/v1/books/{book_id}`
 
-## Want examples?
-I can add a Postman collection or example `curl` snippets for each endpoint — let me know which you'd prefer.
+Borrowing:
+
+- `POST /api/v1/borrow`
+- `POST /api/v1/return`
+- `GET /api/v1/users/{user_id}/borrow-history`
+
+## Notes
+
+- Keep `.env` out of version control.
+- Use Alembic migrations for database schema changes.
+- The current Alembic chain is `20260525_01 -> 20260526_01 -> 20260603_02`.
+- `alembic/versions/20260603_01_add_user_role.py` is not part of the current migration chain.
