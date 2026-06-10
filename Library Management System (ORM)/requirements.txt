@@ -6,3 +6,5 @@ uvicorn[standard]>=0.30.0
 alembic>=1.13.0
 PyJWT>=2.8.0
 passlib>=1.7.4
+celery>=5.6.0
+redis>=5.0.0,<6.0.0
