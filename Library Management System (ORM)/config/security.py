@@ -8,6 +8,7 @@ from pathlib import Path
 
 import dotenv
 import jwt
+import redis
 from passlib.context import CryptContext
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -19,6 +20,12 @@ dotenv.load_dotenv()
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 RBAC_PERMISSIONS_PATH = Path(__file__).resolve().parent.parent / "route_roles_cache.json"
+
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+try:
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+except Exception:
+    redis_client = None
 
 
 def _get_jwt_secret() -> str:
@@ -75,15 +82,30 @@ def decode_access_token(token: str) -> dict[str, object]:
         raise UnauthorizedError("Your token is invalid") from exc
 
 
-@lru_cache(maxsize=1)
 def load_route_roles() -> dict[str, dict[str, list[str]]]:
     import json
+    
+    if redis_client:
+        try:
+            cached_roles = redis_client.get("route_roles_cache")
+            if cached_roles:
+                return json.loads(cached_roles)
+        except Exception:
+            pass
 
     if not RBAC_PERMISSIONS_PATH.exists():
         return {}
 
     with RBAC_PERMISSIONS_PATH.open("r", encoding="utf-8") as file:
-        return json.load(file)
+        data = json.load(file)
+
+    if redis_client:
+        try:
+            redis_client.set("route_roles_cache", json.dumps(data), ex=3600)
+        except Exception:
+            pass
+
+    return data
 
 
 def _route_pattern_matches(route_pattern: str, request_path: str) -> bool:

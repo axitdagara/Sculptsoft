@@ -259,6 +259,8 @@ class Library:
             self.session.add(entry)
             self.session.commit()
             self.session.refresh(entry)
+            from config.library_tasks import send_borrow_confirmation_email
+            send_borrow_confirmation_email.delay(user.name, book.title, str(due_on))
             return BorrowActionResponse(
                 message=f"{user.name} borrowed {book.title}. Due on {due_on}.",
                 user_id=user.user_id,
@@ -306,6 +308,8 @@ class Library:
             else:
                 message = f"{user.name} returned {book.title}. No fine."
 
+            from config.library_tasks import send_return_confirmation_email
+            send_return_confirmation_email.delay(user.name, book.title, str(fine))
             return BorrowActionResponse(
                 message=message,
                 user_id=user.user_id,
