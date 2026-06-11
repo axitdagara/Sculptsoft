@@ -20,7 +20,7 @@ protected_router = APIRouter(prefix="/api/v1", dependencies=[Depends(get_current
     summary="Log in with name and password",
     responses={401: {"model": ErrorResponse}},
 )
-def login(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
+async def login(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
     user = authenticate_user(db, credentials.name, credentials.password)
     token = create_access_token(subject=str(user.user_id), additional_claims={"name": user.name, "role": user.role})
     return TokenResponse(access_token=token)
@@ -33,5 +33,5 @@ def login(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
     tags=["Auth"],
     summary="Get the current authenticated user",
 )
-def get_me(current_user: UserORM = Depends(get_current_user)):
+async def get_me(current_user: UserORM = Depends(get_current_user)):
     return current_user

@@ -16,7 +16,7 @@ protected_router = APIRouter(prefix="/api/v1", dependencies=[Depends(get_current
     tags=["Books"],
     summary="List all books",
 )
-def list_books(library=Depends(get_library)):
+async def list_books(library=Depends(get_library)):
     return library.list_books()
 
 
@@ -28,7 +28,7 @@ def list_books(library=Depends(get_library)):
     summary="Create a new book",
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
 )
-def create_book(
+async def create_book(
     title: str = Body(..., min_length=1, max_length=255),
     author: str = Body(..., min_length=1, max_length=255),
     library=Depends(get_library),
@@ -44,7 +44,7 @@ def create_book(
     summary="Get a single book by ID",
     responses={404: {"model": ErrorResponse}},
 )
-def get_book(book_id: int, library=Depends(get_library)):
+async def get_book(book_id: int, library=Depends(get_library)):
     return library.get_book(book_id)
 
 
@@ -56,7 +56,7 @@ def get_book(book_id: int, library=Depends(get_library)):
     summary="Update a book",
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-def update_book(
+async def update_book(
     book_id: int,
     title: str | None = Body(default=None, min_length=1, max_length=255),
     author: str | None = Body(default=None, min_length=1, max_length=255),
@@ -73,6 +73,6 @@ def update_book(
     summary="Delete a book",
     responses={404: {"model": ErrorResponse}},
 )
-def delete_book(book_id: int, library=Depends(get_library)):
+async def delete_book(book_id: int, library=Depends(get_library)):
     library.delete_book(book_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

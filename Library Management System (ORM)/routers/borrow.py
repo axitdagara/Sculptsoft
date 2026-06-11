@@ -24,7 +24,7 @@ REPORTS_DIR = Path(__file__).resolve().parent.parent / "reports"
     summary="Borrow a book",
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-def borrow_book(
+async def borrow_book(
     user_id: int = Body(..., ge=1),
     book_id: int = Body(..., ge=1),
     current_user: UserORM = Depends(get_current_user),
@@ -43,7 +43,7 @@ def borrow_book(
     summary="Return a book",
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-def return_book(
+async def return_book(
     user_id: int = Body(..., ge=1),
     book_id: int = Body(..., ge=1),
     current_user: UserORM = Depends(get_current_user),
@@ -62,7 +62,7 @@ def return_book(
     summary="Get a user's borrow history",
     responses={404: {"model": ErrorResponse}},
 )
-def get_user_borrow_history(
+async def get_user_borrow_history(
     user_id: int,
     current_user: UserORM = Depends(get_current_user),
     library=Depends(get_library),
@@ -79,7 +79,7 @@ def get_user_borrow_history(
     summary="Generate overdue report (Async)",
     responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
 )
-def generate_overdue_report(
+async def generate_overdue_report(
     current_user: UserORM = Depends(get_current_user),
 ):
     if current_user.role != "admin":
@@ -96,7 +96,7 @@ def generate_overdue_report(
     summary="Download generated report",
     responses={404: {"model": ErrorResponse}},
 )
-def download_report(file_name: str):
+async def download_report(file_name: str):
     if file_name != "overdue.pdf":
         raise HTTPException(status_code=404, detail="Report not found")
 
