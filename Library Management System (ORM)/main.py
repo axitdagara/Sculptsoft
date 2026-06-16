@@ -39,7 +39,7 @@ async def rate_limit_middleware(request: Request, call_next):
             requests = redis_client.incr(key)
             if requests == 1:
                 redis_client.expire(key, 60)
-            if requests > 100:  # 100 requests per minute limit
+            if requests > 100:  
                 return JSONResponse(status_code=429, content={"detail": "Too many requests"})
         except Exception:
             pass
